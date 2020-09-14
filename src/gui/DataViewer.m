@@ -170,6 +170,8 @@ classdef DataViewer < Figure
             
             obj.spectrumList = SpectrumList();
             
+            obj.spectrumDisplay.setContinousDisplay(dataRepresentation.isContinuous);
+            
             obj.imageDisplay = ImageDisplay(obj, Image(1));
             addlistener(obj.imageDisplay, 'PixelSelected', @(src, evnt)obj.pixelSelectedCallback(evnt));
             
@@ -193,7 +195,7 @@ classdef DataViewer < Figure
             
             % If data is in memory, then automatically generate the mean
             % spectrum
-            if(isa(dataRepresentation, 'DataInMemory'))
+            if(isa(dataRepresentation, 'DataInMemory') && ~isa(dataRepresentation, 'ProjectedDataInMemory'))
                 meanSpectrumData = mean(dataRepresentation.data, 1);
                 
                 meanSpectrum = SpectralData(dataRepresentation.spectralChannels, meanSpectrumData);
@@ -212,6 +214,8 @@ classdef DataViewer < Figure
                     obj.peakList(i) = Peak(meanSpectrum, dataRepresentation.spectralChannels(i), meanSpectrumData(i));
                 end
                 obj.updatePeakList();
+                
+                obj.imageListTabGroup.SelectedTab = obj.peaksImageTab;
             end
             
             obj.spectrumDisplay.setLabels(dataRepresentation.spectrumXAxisLabel, dataRepresentation.spectrumYAxisLabel);
@@ -386,8 +390,8 @@ classdef DataViewer < Figure
         
         function peakSelected(obj, peakSelectionEvent)
             if(peakSelectionEvent.selectionType == PeakSelectionEvent.Exact)
-                if(~obj.dataRepresentation.isContinuous)
-                    peakToView = peakSelectionEvent.peakDetails;
+                if(~obj.dataRepresentation.isContinuous && ~isa(obj.dataRepresentation, 'DataOnDisk'))
+                    peakToView = peakSelectionEvent.peakDetails
 
                     [minVal, minLoc] = min(abs(obj.dataRepresentation.spectralChannels - peakToView));
 
@@ -940,6 +944,17 @@ classdef DataViewer < Figure
                 obj.regionOfInterestPanel.setImageForEditor(obj.imageList(imageIndex));
                 
                 set(obj.imageAxis, 'ButtonDownFcn', @(src, evnt)obj.imageAxisClicked());
+            elseif(isa(imageIndex, 'Image'))
+                if isprop(obj.imageTitleLabel, 'Text')
+                    set(obj.imageTitleLabel, 'Text', imageIndex.getDescription());
+                else
+                    set(obj.imageTitleLabel, 'String', imageIndex.getDescription());
+                end
+                
+                obj.imageDisplay.setData(imageIndex);
+                obj.regionOfInterestPanel.setImageForEditor(imageIndex);
+                
+                set(obj.imageAxis, 'ButtonDownFcn', @(src, evnt)obj.imageAxisClicked());
             end
         end
         
@@ -1189,6 +1204,12 @@ classdef DataViewer < Figure
                 obj.progressBarAxis = axes('Parent', obj.handle, 'Position', [.05 .01 .9 .03], 'Visible', 'off');
                 obj.progressBar = ProgressBar(obj.progressBarAxis);          
                 
+            end
+        end
+        
+        function peakListTableSelected(this, src, event)
+            if(isa(this.dataRepresentation, 'DataInMemory'))
+                this.displayImage(this.dataRepresentation.getImageAtIndex(event.Indices(1, 1)));
             end
         end
         
